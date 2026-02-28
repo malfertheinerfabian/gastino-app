@@ -10,3 +10,4 @@ pytz==2024.2
 stripe==11.3.0
 # psycopg2-binary nur auf Render/Production nötig (PostgreSQL)
 # Lokal nutzen wir SQLite — kein Extra-Paket nötig
+gunicorn
