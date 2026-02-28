@@ -156,9 +156,10 @@ Mittagsmenü Di-Sa 3-Gänge 22€."""
         db.session.add(ReservationExtended(tenant_id=tenant.id, **r))
     db.session.commit()
 
-    logger.info(f"Auto-seed fertig: Tenant {tenant.id} ({tenant.name})")
+   logger.info(f"Auto-seed fertig: Tenant {tenant.id} ({tenant.name})")
 
+
+app = create_app()
 
 if __name__ == "__main__":
-    app = create_app()
     app.run(host="0.0.0.0", port=int(os.getenv("PORT", 5000)), debug=True)
