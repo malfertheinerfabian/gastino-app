@@ -14,6 +14,10 @@ def init_db(app):
     app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     db.init_app(app)
     with app.app_context():
+        # Import all models so create_all() creates all tables
+        from core.restaurant_engine import (
+            RestaurantTable, ServicePeriod, ClosedDay, ReservationExtended
+        )
         db.create_all()
 
 
