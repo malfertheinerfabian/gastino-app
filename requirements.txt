@@ -11,3 +11,6 @@ stripe==11.3.0
 # psycopg2-binary nur auf Render/Production nötig (PostgreSQL)
 # Lokal nutzen wir SQLite — kein Extra-Paket nötig
 gunicorn
+
+gunicorn
+psycopg2-binary
