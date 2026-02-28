@@ -1,0 +1,35 @@
+# Gastino.ai Render Deployment
+# render.yaml — Blueprint für automatisches Deployment
+
+services:
+  - type: web
+    name: gastino-api
+    runtime: python
+    region: frankfurt  # DACH-nah
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:create_app() --bind 0.0.0.0:$PORT --workers 2
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: gastino-db
+          property: connectionString
+      - key: WHATSAPP_TOKEN
+        sync: false
+      - key: WHATSAPP_VERIFY_TOKEN
+        value: gastino-verify-2026
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: CLAUDE_MODEL
+        value: claude-sonnet-4-5-20250514
+      - key: STRIPE_SECRET_KEY
+        sync: false
+    healthCheckPath: /health
+
+databases:
+  - name: gastino-db
+    plan: starter
+    region: frankfurt
+    postgresMajorVersion: 16

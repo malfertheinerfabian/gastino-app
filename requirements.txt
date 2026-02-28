@@ -1,0 +1,12 @@
+# Gastino.ai Dependencies
+flask==3.1.0
+flask-sqlalchemy==3.1.1
+sqlalchemy==2.0.36
+anthropic==0.42.0
+requests==2.32.3
+python-dotenv==1.0.1
+gunicorn==23.0.0
+pytz==2024.2
+stripe==11.3.0
+# psycopg2-binary nur auf Render/Production nötig (PostgreSQL)
+# Lokal nutzen wir SQLite — kein Extra-Paket nötig
