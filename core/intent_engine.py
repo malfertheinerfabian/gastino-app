@@ -60,6 +60,8 @@ LETZTER KONVERSATIONSVERLAUF:
 WICHTIG:
 - DATUM: Nutze IMMER {today} als heutiges Datum. "heute Abend" = {today}. "morgen" = {tomorrow}.
 - KONTEXT BEIBEHALTEN: Wenn im Konversationsverlauf bereits ein Datum, eine Uhrzeit oder Personenanzahl erwähnt wurde und der Gast diese nicht explizit ändert, übernimm die Werte aus dem Verlauf! Beispiel: Bot fragte "Für wie viele Personen?" nach Datum 2026-03-01 -> Gast antwortet "3" -> Datum bleibt 2026-03-01. Gast antwortet dann "20 Uhr" -> Datum bleibt 2026-03-01, party_size bleibt 3.
+- NAMEN ALS ANTWORT: Wenn der Bot nach einem Namen gefragt hat ("Auf welchen Namen?") und der Gast mit einem Namen antwortet (z.B. "Thomas", "Müller", "Team Schlern", "Firma Hofer"), ist der Intent IMMER "reservation" mit dem Namen als guest_name. Auch alle vorherigen Entities aus dem Verlauf übernehmen!
+- KURZE ANTWORTEN IM KONTEXT: Wenn der Bot eine spezifische Frage gestellt hat (Personenanzahl, Uhrzeit, Name, Datum) und der Gast kurz antwortet, ist der Intent fast immer "reservation" oder "availability" - NICHT "greeting" oder "general_question".
 - Wenn der Gast eine Zimmernummer erwähnt, extrahiere sie IMMER
 - Wenn Items bestellt werden, parse sie so genau wie moeglich mit Menge
 - Bei gemischten Bestellungen (Essen + Trinken) nutze "roomservice_mixed"
