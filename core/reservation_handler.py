@@ -1,22 +1,122 @@
 """
-Gastino.ai - Reservation Handler
-Verarbeitet Reservierungen UND Verfügbarkeitsanfragen über die ReservationEngine.
+Gastino.ai - Reservation Handler v2
+AI-generierte Antworten statt Templates. Natürlich, flexibel, mehrsprachig.
 """
 import logging
-from datetime import datetime, date, time, timedelta
 import re
+from datetime import datetime, date, time, timedelta
 
 from models.database import db
-from core.restaurant_engine import ReservationEngine
+from core.restaurant_engine import ReservationEngine, ReservationExtended
+from core.ai_client import chat_completion
 
 logger = logging.getLogger("gastino.reservations")
 
 
+# ─── AI RESPONSE GENERATION ─────────────────────────────
+
+RESERVATION_AI_PROMPT = """Du bist Gastino, der freundliche KI-Reservierungsassistent für "{tenant_name}".
+Heute ist {today} ({weekday}).
+
+DEINE PERSÖNLICHKEIT:
+- Warm, natürlich, wie ein aufmerksamer Mitarbeiter an der Rezeption
+- Kurz und knackig (2-4 Sätze, WhatsApp-Stil)
+- Sprache: {language}
+- Sparsam mit Emojis (max 1-2)
+- Verwende den Namen des Gastes wenn bekannt
+- Sei NICHT robotisch oder formal
+
+BETRIEBSINFO:
+{tenant_context}
+
+SITUATION:
+{situation}
+
+GESAMMELTE DATEN:
+{entities_summary}
+
+Antworte dem Gast natürlich und passend zur Situation. NUR die Antwort, keine Erklärungen."""
+
+
+def _ai_response(tenant, language, situation, entities, config):
+    """Generiert eine natürliche AI-Antwort für Reservierungssituationen."""
+    today = date.today()
+    weekday_names = {0: "Montag", 1: "Dienstag", 2: "Mittwoch", 3: "Donnerstag",
+                     4: "Freitag", 5: "Samstag", 6: "Sonntag"}
+
+    parts = []
+    if entities.get("date"):
+        parts.append(f"Datum: {entities['date']}")
+    if entities.get("time"):
+        parts.append(f"Uhrzeit: {entities['time']}")
+    if entities.get("party_size"):
+        parts.append(f"Personen: {entities['party_size']}")
+    if entities.get("guest_name"):
+        parts.append(f"Name: {entities['guest_name']}")
+    entities_summary = ", ".join(parts) if parts else "Noch keine Daten gesammelt."
+
+    system = RESERVATION_AI_PROMPT.format(
+        tenant_name=tenant.name,
+        today=today.strftime("%d.%m.%Y"),
+        weekday=weekday_names.get(today.weekday(), ""),
+        language={"de": "Deutsch", "it": "Italienisch", "en": "Englisch"}.get(language, "Deutsch"),
+        tenant_context=tenant.get_full_context() if hasattr(tenant, 'get_full_context') else "",
+        situation=situation,
+        entities_summary=entities_summary,
+    )
+
+    try:
+        return chat_completion(
+            system_prompt=system,
+            user_message=situation,
+            config=config,
+            temperature=0.7,
+            max_tokens=250,
+        )
+    except Exception as e:
+        logger.error(f"AI Response Fehler: {e}")
+        return None
+
+
+# ─── ENTITY ACCUMULATION ─────────────────────────────────
+
+def _accumulate_entities(conversation, analysis):
+    """Sammelt Entities über mehrere Nachrichten."""
+    stored = {}
+    if conversation and conversation.pending_entities:
+        stored = dict(conversation.pending_entities)
+
+    new_entities = analysis.get("entities", {})
+
+    for key in ("date", "time", "party_size", "guest_name", "zone_preference", "notes", "special_requests"):
+        new_val = new_entities.get(key)
+        old_val = stored.get(key)
+
+        if new_val is not None and new_val != "":
+            if key == "date" and old_val and old_val != new_val:
+                today_str = date.today().isoformat()
+                if new_val == today_str and old_val != today_str:
+                    logger.info(f"Ignoriere AI-generiertes 'heute' Datum, behalte: {old_val}")
+                    continue
+            stored[key] = new_val
+
+    if conversation:
+        conversation.pending_entities = stored
+        db.session.commit()
+
+    logger.info(f"Accumulated entities: {stored}")
+    return stored
+
+
+def _clear_pending_entities(conversation):
+    if conversation:
+        conversation.pending_entities = {}
+        db.session.commit()
+
+
+# ─── PROCESS AVAILABILITY ─────────────────────────────────
+
 def process_availability(tenant, guest, conversation, analysis, config):
-    """
-    Prüft Verfügbarkeit über die ReservationEngine.
-    Sammelt Entities über mehrere Nachrichten.
-    """
     language = analysis.get("language", "de")
     entities = _accumulate_entities(conversation, analysis)
 
@@ -24,28 +124,29 @@ def process_availability(tenant, guest, conversation, analysis, config):
     res_time = entities.get("time")
     party_size = entities.get("party_size")
 
-    # Mindestens party_size und date brauchen wir
     if not party_size:
-        return {"de": "Für wie viele Personen suchen Sie einen Tisch?",
-                "it": "Per quante persone cerca un tavolo?",
-                "en": "How many guests will be dining?"}.get(language, "Für wie viele Personen?")
+        resp = _ai_response(tenant, language,
+            "Gast fragt nach Verfügbarkeit aber hat die Personenanzahl nicht genannt. Frage natürlich nach.",
+            entities, config)
+        return resp or "Für wie viele Personen suchen Sie einen Tisch?"
 
     if not res_date:
-        return {"de": "Für welchen Tag möchten Sie kommen?",
-                "it": "Per quale giorno desidera venire?",
-                "en": "For which day would you like to come?"}.get(language, "Für welchen Tag?")
+        resp = _ai_response(tenant, language,
+            "Gast fragt nach Verfügbarkeit für {} Personen aber hat kein Datum genannt. Frage natürlich nach dem Tag.".format(party_size),
+            entities, config)
+        return resp or "Für welchen Tag möchten Sie kommen?"
 
     try:
         parsed_date = _parse_date(res_date)
     except (ValueError, TypeError):
-        return {"de": "Entschuldigung, ich konnte das Datum nicht verstehen. Könnten Sie es nochmal angeben? (z.B. morgen, 28.02.2026)",
-                "it": "Mi scusi, non ho capito la data. Puo ripeterla? (es. domani, 28.02.2026)",
-                "en": "Sorry, I couldn't understand the date. Could you provide it again? (e.g. tomorrow, 28/02/2026)"}.get(language, "Datum nicht verstanden.")
+        resp = _ai_response(tenant, language,
+            "Gast hat ein Datum genannt das ich nicht verstanden habe: '{}'. Bitte freundlich um Wiederholung.".format(res_date),
+            entities, config)
+        return resp or "Entschuldigung, ich konnte das Datum nicht verstehen."
 
     party_size = int(party_size)
     engine = ReservationEngine(tenant.id)
 
-    # Wenn Uhrzeit angegeben: spezifischen Slot prüfen
     if res_time:
         try:
             parsed_time = _parse_time(res_time)
@@ -57,82 +158,71 @@ def process_availability(tenant, guest, conversation, analysis, config):
 
             if result["available"]:
                 table = result["table"]
-                return _availability_positive(language, parsed_date, parsed_time, party_size, table)
+                zone_name = table.get("zone", "") if isinstance(table, dict) else getattr(table, "zone", "")
+                table_name = table.get("name", "") if isinstance(table, dict) else getattr(table, "name", "")
+                resp = _ai_response(tenant, language,
+                    "Verfügbarkeit geprüft: JA, es ist frei am {} um {} für {} Personen. "
+                    "Tisch: {} ({}). Frage ob der Gast reservieren möchte.".format(
+                        parsed_date.strftime('%d.%m.%Y'), parsed_time.strftime('%H:%M'),
+                        party_size, table_name, zone_name),
+                    entities, config)
+                return resp or "Am {} um {} ist für {} Personen frei!".format(
+                    parsed_date.strftime('%d.%m.%Y'), parsed_time.strftime('%H:%M'), party_size)
             else:
                 reason = result.get("reason", "fully_booked")
                 alternatives = result.get("alternatives", [])
 
                 if reason == "closed":
-                    return _closed_message(language, parsed_date)
+                    day_names = {0:"Montag",1:"Dienstag",2:"Mittwoch",3:"Donnerstag",4:"Freitag",5:"Samstag",6:"Sonntag"}
+                    resp = _ai_response(tenant, language,
+                        "Am {} ({}) ist Ruhetag. Schlage freundlich einen anderen Tag vor.".format(
+                            parsed_date.strftime('%d.%m.%Y'), day_names.get(parsed_date.weekday(), '')),
+                        entities, config)
+                    return resp or "Am {} haben wir leider Ruhetag.".format(parsed_date.strftime('%d.%m.%Y'))
                 elif reason == "outside_hours":
-                    return _outside_hours_message(language, parsed_date, tenant)
+                    resp = _ai_response(tenant, language,
+                        "Die gewünschte Uhrzeit {} liegt außerhalb der Servicezeiten. Nenne die Servicezeiten und frage nach einer anderen Uhrzeit.".format(
+                            parsed_time.strftime('%H:%M')),
+                        entities, config)
+                    return resp or "Zu dieser Uhrzeit nehmen wir leider keine Reservierungen an."
                 else:
-                    return _unavailable_message(language, alternatives, parsed_date, party_size)
+                    alt_text = ""
+                    if alternatives:
+                        alt_text = "Alternativen: " + ", ".join([a['time'] + " Uhr" for a in alternatives[:3]])
+                    resp = _ai_response(tenant, language,
+                        "Am {} um {} ist für {} Personen leider ausgebucht. {}".format(
+                            parsed_date.strftime('%d.%m.%Y'), parsed_time.strftime('%H:%M'),
+                            party_size, alt_text),
+                        entities, config)
+                    return resp or "Leider ist dieser Zeitpunkt ausgebucht."
 
-    # Keine Uhrzeit: alle verfügbaren Slots zeigen
     slots = engine.get_available_slots(parsed_date, party_size)
 
     if not slots:
-        # Pruefen ob geschlossen
         if engine._is_closed(parsed_date):
-            return _closed_message(language, parsed_date)
-        return _no_slots_message(language, parsed_date, party_size)
+            day_names = {0:"Montag",1:"Dienstag",2:"Mittwoch",3:"Donnerstag",4:"Freitag",5:"Samstag",6:"Sonntag"}
+            resp = _ai_response(tenant, language,
+                "Am {} ({}) ist Ruhetag.".format(
+                    parsed_date.strftime('%d.%m.%Y'), day_names.get(parsed_date.weekday(), '')),
+                entities, config)
+            return resp or "Am {} haben wir leider Ruhetag.".format(parsed_date.strftime('%d.%m.%Y'))
+        resp = _ai_response(tenant, language,
+            "Am {} sind für {} Personen keine Plätze mehr frei.".format(
+                parsed_date.strftime('%d.%m.%Y'), party_size),
+            entities, config)
+        return resp or "Leider keine Plätze mehr frei."
 
-    return _show_available_slots(language, slots, parsed_date, party_size)
-
-
-def _accumulate_entities(conversation, analysis):
-    """
-    Sammelt Entities über mehrere Nachrichten.
-    Neue Werte überschreiben alte NUR wenn sie nicht None sind.
-    Verhindert dass die AI gespeicherte Werte mit erfundenen überschreibt.
-    """
-    # Bisherige gesammelte Entities laden
-    stored = {}
-    if conversation and conversation.pending_entities:
-        stored = dict(conversation.pending_entities)
-
-    # Neue Entities aus aktueller Analyse
-    new_entities = analysis.get("entities", {})
-
-    # Merge: Nur echte neue Werte übernehmen (nicht None, nicht leer)
-    for key in ("date", "time", "party_size", "guest_name", "zone_preference", "notes", "special_requests"):
-        new_val = new_entities.get(key)
-        old_val = stored.get(key)
-
-        if new_val is not None and new_val != "":
-            # Spezialfall Datum: Wenn wir schon ein Datum haben das NICHT heute ist,
-            # und die AI plötzlich "heute" zurückgibt, behalte das alte Datum.
-            # Das passiert wenn der Gast nur "20 Uhr" sagt und die AI das heutige Datum erfindet.
-            if key == "date" and old_val and old_val != new_val:
-                from datetime import date as date_cls
-                today_str = date_cls.today().isoformat()
-                if new_val == today_str and old_val != today_str:
-                    logger.info(f"Ignoriere AI-generiertes 'heute' Datum, behalte: {old_val}")
-                    continue
-            stored[key] = new_val
-
-    # Speichern
-    if conversation:
-        conversation.pending_entities = stored
-        db.session.commit()
-
-    logger.info(f"Accumulated entities: {stored}")
-    return stored
+    slots_text = ", ".join([s['time'] + " Uhr" for s in slots[:6]])
+    resp = _ai_response(tenant, language,
+        "Am {} sind für {} Personen folgende Zeiten frei: {}. Frage welche Zeit passt.".format(
+            parsed_date.strftime('%d.%m.%Y'), party_size, slots_text),
+        entities, config)
+    return resp or "Verfügbare Zeiten: {}".format(slots_text)
 
 
-def _clear_pending_entities(conversation):
-    """Löscht gesammelte Entities nach erfolgreicher Reservierung."""
-    if conversation:
-        conversation.pending_entities = {}
-        db.session.commit()
-
+# ─── PROCESS RESERVATION ─────────────────────────────────
 
 def process_reservation(tenant, guest, conversation, analysis, config):
-    """
-    Verarbeitet Reservierungsanfragen.
-    Sammelt Entities über mehrere Nachrichten (Datum, Zeit, Personen, Name).
-    """
     language = analysis.get("language", "de")
     entities = _accumulate_entities(conversation, analysis)
 
@@ -152,14 +242,42 @@ def process_reservation(tenant, guest, conversation, analysis, config):
         missing.append("guest_name")
 
     if missing:
-        return _ask_missing_info(language, missing, entities)
+        missing_text = {
+            "date": "Datum",
+            "time": "Uhrzeit",
+            "party_size": "Personenanzahl",
+            "guest_name": "Name für die Reservierung",
+        }
+        missing_str = ", ".join([missing_text.get(m, m) for m in missing])
+
+        known_parts = []
+        if res_date:
+            known_parts.append("Datum: {}".format(res_date))
+        if res_time:
+            known_parts.append("Uhrzeit: {}".format(res_time))
+        if party_size:
+            known_parts.append("Personen: {}".format(party_size))
+        if guest_name:
+            known_parts.append("Name: {}".format(guest_name))
+        known_str = ", ".join(known_parts) if known_parts else "noch nichts"
+
+        resp = _ai_response(tenant, language,
+            "Gast möchte reservieren. Bereits bekannt: {}. "
+            "Noch fehlend: {}. Frage natürlich nach den fehlenden Infos in EINER Nachricht.".format(
+                known_str, missing_str),
+            entities, config)
+        return resp or _ask_missing_fallback(language, missing)
 
     try:
         parsed_date = _parse_date(res_date)
         parsed_time = _parse_time(res_time)
     except (ValueError, TypeError) as e:
-        logger.warning(f"Datum/Zeit Parse-Fehler: {e}")
-        return _ask_missing_info(language, ["date", "time"], entities)
+        logger.warning("Datum/Zeit Parse-Fehler: {}".format(e))
+        resp = _ai_response(tenant, language,
+            "Konnte Datum '{}' oder Zeit '{}' nicht verstehen. Bitte freundlich um Wiederholung.".format(
+                res_date, res_time),
+            entities, config)
+        return resp or "Entschuldigung, ich konnte die Angaben nicht richtig verstehen."
 
     engine = ReservationEngine(tenant.id)
 
@@ -173,50 +291,83 @@ def process_reservation(tenant, guest, conversation, analysis, config):
         zone_preference=entities.get("zone_preference"),
         notes=entities.get("notes"),
         special_requests=entities.get("special_requests"),
-        source="whatsapp",
+        source="telegram",
         guest_id=guest.id,
     )
 
     if result["success"]:
         _clear_pending_entities(conversation)
         res = result["reservation"]
-        return _confirmation_message(
-            language=language,
-            res_date=parsed_date,
-            res_time=parsed_time,
-            party_size=int(party_size),
-            guest_name=guest_name,
-            table_name=res.get("table"),
-            zone=res.get("zone"),
-        )
+        table_name = res.get("table", "")
+        zone = res.get("zone", "")
+
+        resp = _ai_response(tenant, language,
+            "Reservierung ERFOLGREICH erstellt! Details: {} um {} Uhr, "
+            "{} Personen auf den Namen {}, Tisch: {} ({}). "
+            "Bestätige die Reservierung freundlich und wünsche einen schönen Abend.".format(
+                parsed_date.strftime('%d.%m.%Y'), parsed_time.strftime('%H:%M'),
+                party_size, guest_name, table_name, zone),
+            entities, config)
+        return resp or "Reservierung bestätigt! {} um {}, {} Personen, {}. Wir freuen uns auf Sie!".format(
+            parsed_date.strftime('%d.%m.%Y'), parsed_time.strftime('%H:%M'), party_size, guest_name)
     else:
         alternatives = result.get("alternatives", [])
         error = result.get("error", "fully_booked")
-        if error == "closed":
-            return _closed_message(language, parsed_date)
-        return _unavailable_message(language, alternatives, parsed_date, int(party_size))
 
+        if error == "closed":
+            day_names = {0:"Montag",1:"Dienstag",2:"Mittwoch",3:"Donnerstag",4:"Freitag",5:"Samstag",6:"Sonntag"}
+            resp = _ai_response(tenant, language,
+                "Am {} ({}) ist Ruhetag.".format(
+                    parsed_date.strftime('%d.%m.%Y'), day_names.get(parsed_date.weekday(), '')),
+                entities, config)
+            return resp or "Am {} haben wir leider Ruhetag.".format(parsed_date.strftime('%d.%m.%Y'))
+
+        alt_text = ""
+        if alternatives:
+            alt_text = "Alternativen: " + ", ".join([a['time'] + " Uhr" for a in alternatives[:3]])
+        resp = _ai_response(tenant, language,
+            "Reservierung NICHT möglich am {} um {} für {} Personen. {}".format(
+                parsed_date.strftime('%d.%m.%Y'), parsed_time.strftime('%H:%M'),
+                party_size, alt_text),
+            entities, config)
+        return resp or "Leider ist dieser Zeitpunkt ausgebucht."
+
+
+# ─── PROCESS CANCELLATION ─────────────────────────────────
 
 def process_cancellation(tenant, guest, conversation, analysis, config):
-    """
-    Storniert eine Reservierung.
-    Sucht offene Reservierungen des Gastes und storniert die passende.
-    """
     language = analysis.get("language", "de")
     entities = analysis.get("entities", {})
     target_date_str = entities.get("date")
 
-    from core.restaurant_engine import ReservationExtended
+    # Letzte User-Nachricht für Nummernauswahl
+    last_msg = ""
+    if conversation:
+        from models.database import Message
+        last = (Message.query
+                .filter_by(conversation_id=conversation.id, direction="inbound")
+                .order_by(Message.created_at.desc())
+                .first())
+        if last:
+            last_msg = last.content or ""
 
-    # Suche offene Reservierungen dieses Gastes
+    number_match = re.search(r'(\d+)', last_msg)
+    wants_all = any(w in last_msg.lower() for w in ["alle", "tutti", "all", "alles"])
+
+    # Finde Reservierungen
     query = (
         ReservationExtended.query
-        .filter_by(tenant_id=tenant.id, guest_id=guest.id, status="confirmed")
+        .filter_by(tenant_id=tenant.id, status="confirmed")
+        .filter(
+            db.or_(
+                ReservationExtended.guest_id == guest.id,
+                ReservationExtended.guest_phone == guest.whatsapp_id,
+            )
+        )
         .order_by(ReservationExtended.date, ReservationExtended.time)
     )
 
-    # Wenn ein Datum genannt wurde, filtere danach
-    if target_date_str:
+    if target_date_str and not wants_all and not number_match:
         try:
             target_date = _parse_date(target_date_str)
             query = query.filter_by(date=target_date)
@@ -226,234 +377,86 @@ def process_cancellation(tenant, guest, conversation, analysis, config):
     reservations = query.all()
 
     if not reservations:
-        # Auch per Telefon/Name suchen
-        guest_phone = guest.whatsapp_id
-        query2 = (
-            ReservationExtended.query
-            .filter_by(tenant_id=tenant.id, status="confirmed")
-            .filter(ReservationExtended.guest_phone == guest_phone)
-            .order_by(ReservationExtended.date, ReservationExtended.time)
-        )
-        if target_date_str:
-            try:
-                target_date = _parse_date(target_date_str)
-                query2 = query2.filter_by(date=target_date)
-            except (ValueError, TypeError):
-                pass
-        reservations = query2.all()
+        resp = _ai_response(tenant, language,
+            "Gast möchte stornieren, aber keine offenen Reservierungen gefunden. Frage freundlich ob unter einem anderen Namen reserviert wurde.",
+            entities, config)
+        return resp or "Ich konnte keine offene Reservierung für Sie finden."
 
-    if not reservations:
-        return {
-            "de": "Ich konnte keine offene Reservierung für Sie finden. Haben Sie unter einem anderen Namen reserviert?",
-            "it": "Non ho trovato prenotazioni aperte a suo nome. Ha prenotato con un altro nome?",
-            "en": "I couldn't find any open reservations for you. Did you book under a different name?",
-        }.get(language, "Keine Reservierung gefunden.")
+    engine = ReservationEngine(tenant.id)
 
+    # Alle stornieren
+    if wants_all:
+        count = len(reservations)
+        for res in reservations:
+            engine.cancel_reservation(res.id)
+        _clear_pending_entities(conversation)
+
+        resp = _ai_response(tenant, language,
+            "ALLE {} Reservierungen wurden erfolgreich storniert. Bestätige freundlich.".format(count),
+            entities, config)
+        return resp or "Alle {} Reservierungen wurden storniert.".format(count)
+
+    # Genau eine → direkt stornieren
     if len(reservations) == 1:
-        # Genau eine → direkt stornieren
         res = reservations[0]
-        engine = ReservationEngine(tenant.id)
         engine.cancel_reservation(res.id)
         _clear_pending_entities(conversation)
 
-        date_str = res.date.strftime("%d.%m.%Y")
-        time_str = res.time.strftime("%H:%M")
-        logger.info(f"Stornierung: {res.guest_name} — {date_str} {time_str}")
+        resp = _ai_response(tenant, language,
+            "Reservierung storniert: {} um {}, {} Personen, {}. Bestätige freundlich.".format(
+                res.date.strftime('%d.%m.%Y'), res.time.strftime('%H:%M'),
+                res.party_size, res.guest_name),
+            entities, config)
+        return resp or "Ihre Reservierung wurde storniert."
 
-        return {
-            "de": f"Ihre Reservierung wurde storniert:\n\n❌ {date_str} um {time_str} Uhr\n{res.party_size} Personen auf den Namen {res.guest_name}\n\nSchade, dass es nicht klappt! Sie können jederzeit wieder reservieren.",
-            "it": f"La sua prenotazione è stata cancellata:\n\n❌ {date_str} alle {time_str}\n{res.party_size} persone a nome {res.guest_name}\n\nPeccato! Può prenotare di nuovo in qualsiasi momento.",
-            "en": f"Your reservation has been cancelled:\n\n❌ {date_str} at {time_str}\n{res.party_size} guests under {res.guest_name}\n\nSorry it didn't work out! You can book again anytime.",
-        }.get(language, f"Reservierung storniert: {date_str} {time_str}")
+    # Nummer gewählt
+    if number_match:
+        idx = int(number_match.group(1))
+        if 1 <= idx <= len(reservations):
+            res = reservations[idx - 1]
+            engine.cancel_reservation(res.id)
+            _clear_pending_entities(conversation)
 
-    else:
-        # Mehrere Reservierungen → auflisten und nachfragen
-        lines_de = []
-        lines_it = []
-        lines_en = []
-        for i, res in enumerate(reservations[:5], 1):
-            d = res.date.strftime("%d.%m.%Y")
-            t = res.time.strftime("%H:%M")
-            lines_de.append(f"  {i}. {d} um {t} Uhr — {res.party_size} Pers. ({res.guest_name})")
-            lines_it.append(f"  {i}. {d} alle {t} — {res.party_size} pers. ({res.guest_name})")
-            lines_en.append(f"  {i}. {d} at {t} — {res.party_size} guests ({res.guest_name})")
+            resp = _ai_response(tenant, language,
+                "Reservierung #{} storniert: {} um {}, {} Personen, {}. Bestätige freundlich.".format(
+                    idx, res.date.strftime('%d.%m.%Y'), res.time.strftime('%H:%M'),
+                    res.party_size, res.guest_name),
+                entities, config)
+            return resp or "Reservierung storniert."
 
-        return {
-            "de": f"Ich habe mehrere Reservierungen gefunden:\n\n" + "\n".join(lines_de) + "\n\nWelche möchten Sie stornieren? (Datum oder Nummer nennen)",
-            "it": f"Ho trovato più prenotazioni:\n\n" + "\n".join(lines_it) + "\n\nQuale desidera cancellare? (Indichi la data o il numero)",
-            "en": f"I found multiple reservations:\n\n" + "\n".join(lines_en) + "\n\nWhich one would you like to cancel? (Mention the date or number)",
-        }.get(language, "Mehrere Reservierungen gefunden.")
+    # Mehrere → Liste zeigen
+    lines = []
+    for i, res in enumerate(reservations[:5], 1):
+        d = res.date.strftime("%d.%m.%Y")
+        t = res.time.strftime("%H:%M")
+        lines.append("  {}. {} um {} Uhr - {} Pers. ({})".format(i, d, t, res.party_size, res.guest_name))
 
+    list_text = "\n".join(lines)
 
-# ─── RESPONSE MESSAGES ─────────────────────────────────
+    resp = _ai_response(tenant, language,
+        "Gast möchte stornieren und hat mehrere Reservierungen:\n{}\n"
+        "Frage natürlich welche storniert werden soll. Der Gast kann die Nummer nennen oder 'alle' sagen.".format(list_text),
+        entities, config)
+    if resp:
+        return resp
 
-def _availability_positive(language, d, t, party_size, table):
-    date_str = d.strftime("%d.%m.%Y")
-    time_str = t.strftime("%H:%M")
-    zone_de = {"innen": "Innenbereich", "terrasse": "Terrasse", "stube": "Stube", "garten": "Garten"}
-    zone_it = {"innen": "sala interna", "terrasse": "terrazza", "stube": "stube", "garten": "giardino"}
-
-    zone_info_de = f" ({zone_de.get(table.get('zone', ''), table.get('zone', ''))})" if table.get("zone") else ""
-    zone_info_it = f" ({zone_it.get(table.get('zone', ''), table.get('zone', ''))})" if table.get("zone") else ""
-
-    msgs = {
-        "de": (f"Ja, am {date_str} um {time_str} Uhr haben wir noch Platz für {party_size} Personen!\n"
-               f"Tisch: {table.get('name', '?')}{zone_info_de}\n\n"
-               f"Soll ich direkt für Sie reservieren?"),
-        "it": (f"Si, il {date_str} alle {time_str} abbiamo ancora posto per {party_size} persone!\n"
-               f"Tavolo: {table.get('name', '?')}{zone_info_it}\n\n"
-               f"Desidera che prenoti subito?"),
-        "en": (f"Yes, on {date_str} at {time_str} we have a table for {party_size} guests!\n"
-               f"Table: {table.get('name', '?')}\n\n"
-               f"Shall I book it for you?"),
-    }
-    return msgs.get(language, msgs["de"])
+    return "Ich habe mehrere Reservierungen gefunden:\n\n{}\n\nWelche möchten Sie stornieren? (Nummer oder 'alle')".format(list_text)
 
 
-def _show_available_slots(language, slots, d, party_size):
-    date_str = d.strftime("%d.%m.%Y")
-    slots_limited = slots[:6]
+# ─── FALLBACK RESPONSES ─────────────────────────────────
 
-    slots_de = "\n".join([f"  {s['time']} Uhr ({s.get('best_table', '')})" for s in slots_limited])
-    slots_it = "\n".join([f"  ore {s['time']} ({s.get('best_table', '')})" for s in slots_limited])
-    slots_en = "\n".join([f"  {s['time']} ({s.get('best_table', '')})" for s in slots_limited])
-
-    msgs = {
-        "de": (f"Am {date_str} haben wir folgende freie Zeiten für {party_size} Personen:\n\n"
-               f"{slots_de}\n\n"
-               f"Welche Zeit passt Ihnen am besten?"),
-        "it": (f"Il {date_str} abbiamo questi orari liberi per {party_size} persone:\n\n"
-               f"{slots_it}\n\n"
-               f"Quale orario preferisce?"),
-        "en": (f"On {date_str} we have these available times for {party_size} guests:\n\n"
-               f"{slots_en}\n\n"
-               f"Which time works best for you?"),
-    }
-    return msgs.get(language, msgs["de"])
-
-
-def _closed_message(language, d):
-    date_str = d.strftime("%d.%m.%Y")
-    day_names_de = {0:"Montag",1:"Dienstag",2:"Mittwoch",3:"Donnerstag",4:"Freitag",5:"Samstag",6:"Sonntag"}
-    day_name = day_names_de.get(d.weekday(), "")
-
-    msgs = {
-        "de": f"Am {date_str} ({day_name}) haben wir leider Ruhetag. Möchten Sie einen anderen Tag versuchen?",
-        "it": f"Il {date_str} siamo chiusi. Desidera provare un altro giorno?",
-        "en": f"We're closed on {date_str}. Would you like to try another day?",
-    }
-    return msgs.get(language, msgs["de"])
-
-
-def _outside_hours_message(language, d, tenant):
-    msgs = {
-        "de": "Zu dieser Uhrzeit nehmen wir leider keine Reservierungen an. Unsere Servicezeiten: Mittag 11:30-14:00, Abend 18:00-22:00. Möchten Sie eine andere Uhrzeit?",
-        "it": "A quest'ora non accettiamo prenotazioni. I nostri orari: pranzo 11:30-14:00, cena 18:00-22:00. Desidera un altro orario?",
-        "en": "We don't accept reservations at this time. Our service hours: lunch 11:30-14:00, dinner 18:00-22:00. Would you like another time?",
-    }
-    return msgs.get(language, msgs["de"])
-
-
-def _no_slots_message(language, d, party_size):
-    date_str = d.strftime("%d.%m.%Y")
-    msgs = {
-        "de": f"Leider sind am {date_str} für {party_size} Personen keine Plätze mehr frei. Möchten Sie einen anderen Tag versuchen?",
-        "it": f"Purtroppo il {date_str} non ci sono posti disponibili per {party_size} persone. Desidera provare un altro giorno?",
-        "en": f"Unfortunately, we're fully booked on {date_str} for {party_size} guests. Would you like to try another day?",
-    }
-    return msgs.get(language, msgs["de"])
-
-
-def _unavailable_message(language, alternatives, target_date, party_size):
-    date_str = target_date.strftime("%d.%m.%Y")
-
-    if alternatives:
-        alt_de = "\n".join([f"  {a['time']} Uhr" for a in alternatives[:3]])
-        alt_it = "\n".join([f"  ore {a['time']}" for a in alternatives[:3]])
-        alt_en = "\n".join([f"  {a['time']}" for a in alternatives[:3]])
-
-        msgs = {
-            "de": (f"Leider ist dieser Zeitpunkt am {date_str} für {party_size} Personen ausgebucht.\n\n"
-                   f"Folgende Zeiten wären noch verfügbar:\n{alt_de}\n\n"
-                   f"Soll ich einen dieser Termine reservieren?"),
-            "it": (f"Purtroppo questo orario per il {date_str} per {party_size} persone e al completo.\n\n"
-                   f"Questi orari sono ancora disponibili:\n{alt_it}\n\n"
-                   f"Desidera prenotare uno di questi?"),
-            "en": (f"Unfortunately this time on {date_str} for {party_size} guests is fully booked.\n\n"
-                   f"These times are still available:\n{alt_en}\n\n"
-                   f"Would you like me to book one of these?"),
-        }
-    else:
-        msgs = {
-            "de": f"Am {date_str} sind wir für {party_size} Personen komplett ausgebucht. Möchten Sie einen anderen Tag versuchen?",
-            "it": f"Il {date_str} siamo al completo per {party_size} persone. Desidera provare un altro giorno?",
-            "en": f"We're fully booked on {date_str} for {party_size} guests. Would you like to try a different day?",
-        }
-
-    return msgs.get(language, msgs["de"])
-
-
-def _ask_missing_info(language, missing, entities):
-    # Alles fehlt
-    if len(missing) >= 3 and "date" in missing and "time" in missing:
-        msgs = {"de": "Gerne reserviere ich einen Tisch! Für wann (Datum und Uhrzeit), für wie viele Personen und auf welchen Namen?",
-                "it": "Con piacere le riservo un tavolo! Per quando (data e ora), per quante persone e a che nome?",
-                "en": "I'd be happy to reserve a table! For when (date and time), how many guests and under what name?"}
-    elif "date" in missing:
-        msgs = {"de": "Für welches Datum möchten Sie reservieren?",
-                "it": "Per quale data desidera prenotare?",
-                "en": "For which date would you like to reserve?"}
-    elif "time" in missing:
-        msgs = {"de": "Um welche Uhrzeit möchten Sie kommen?",
-                "it": "A che ora desidera venire?",
-                "en": "What time would you like to come?"}
-    elif "party_size" in missing and "guest_name" in missing:
-        msgs = {"de": "Für wie viele Personen und auf welchen Namen darf ich reservieren?",
-                "it": "Per quante persone e a che nome devo prenotare?",
-                "en": "How many guests and under what name should I reserve?"}
-    elif "party_size" in missing:
-        msgs = {"de": "Für wie viele Personen soll ich reservieren?",
-                "it": "Per quante persone devo prenotare?",
-                "en": "How many guests will be dining?"}
-    elif "guest_name" in missing:
-        msgs = {"de": "Auf welchen Namen darf ich die Reservierung eintragen?",
-                "it": "A che nome devo registrare la prenotazione?",
-                "en": "Under what name should I make the reservation?"}
-    else:
-        msgs = {"de": "Könnten Sie mir bitte die Details für Ihre Reservierung geben?",
-                "it": "Può darmi i dettagli per la sua prenotazione?",
-                "en": "Could you give me the details for your reservation?"}
-    return msgs.get(language, msgs["de"])
-
-
-def _confirmation_message(language, res_date, res_time, party_size, guest_name=None, table_name=None, zone=None):
-    date_str = res_date.strftime("%d.%m.%Y")
-    time_str = res_time.strftime("%H:%M")
-    zone_de = {"innen": "Innenbereich", "terrasse": "Terrasse", "stube": "Stube", "garten": "Garten"}
-
-    name_de = f" auf den Namen {guest_name}" if guest_name else ""
-    name_it = f" a nome {guest_name}" if guest_name else ""
-    name_en = f" under the name {guest_name}" if guest_name else ""
-    table_de = f"\nTisch: {table_name}" + (f" ({zone_de.get(zone, zone)})" if zone else "") if table_name else ""
-
-    msgs = {
-        "de": (f"Reservierung bestätigt!\n\n"
-               f"{date_str}\n"
-               f"{time_str} Uhr\n"
-               f"{party_size} Personen{name_de}{table_de}\n\n"
-               f"Wir freuen uns auf Sie!"),
-        "it": (f"Prenotazione confermata!\n\n"
-               f"{date_str}\n"
-               f"ore {time_str}\n"
-               f"{party_size} persone{name_it}\n\n"
-               f"Vi aspettiamo!"),
-        "en": (f"Reservation confirmed!\n\n"
-               f"{date_str}\n"
-               f"{time_str}\n"
-               f"{party_size} guests{name_en}\n\n"
-               f"We look forward to seeing you!"),
-    }
-    return msgs.get(language, msgs["de"])
+def _ask_missing_fallback(language, missing):
+    if "date" in missing and "time" in missing:
+        return "Gerne! Für wann (Datum und Uhrzeit), wie viele Personen und auf welchen Namen?"
+    if "guest_name" in missing:
+        return "Auf welchen Namen darf ich die Reservierung eintragen?"
+    if "party_size" in missing:
+        return "Für wie viele Personen soll ich reservieren?"
+    if "time" in missing:
+        return "Um welche Uhrzeit möchten Sie kommen?"
+    if "date" in missing:
+        return "Für welches Datum möchten Sie reservieren?"
+    return "Könnten Sie mir bitte die Details geben?"
 
 
 # ─── PARSING HELPERS ────────────────────────────────────
@@ -477,7 +480,6 @@ def _parse_date(date_str):
     if lower in ("übermorgen", "dopodomani", "day after tomorrow"):
         return today + timedelta(days=2)
 
-    # "naechsten Freitag" etc.
     day_map = {"montag":0,"dienstag":1,"mittwoch":2,"donnerstag":3,"freitag":4,"samstag":5,"sonntag":6,
                "lunedi":0,"martedi":1,"mercoledi":2,"giovedi":3,"venerdi":4,"sabato":5,"domenica":6,
                "monday":0,"tuesday":1,"wednesday":2,"thursday":3,"friday":4,"saturday":5,"sunday":6}
@@ -488,7 +490,7 @@ def _parse_date(date_str):
                 days_ahead += 7
             return today + timedelta(days=days_ahead)
 
-    raise ValueError(f"Unbekanntes Datum: {date_str}")
+    raise ValueError("Unbekanntes Datum: {}".format(date_str))
 
 
 def _parse_time(time_str):
@@ -509,4 +511,4 @@ def _parse_time(time_str):
             hour += 12
         return time(hour, 0)
 
-    raise ValueError(f"Unbekannte Uhrzeit: {time_str}")
+    raise ValueError("Unbekannte Uhrzeit: {}".format(time_str))
