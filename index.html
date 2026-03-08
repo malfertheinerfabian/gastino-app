@@ -1,0 +1,1002 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="description" content="Gastino – Der erste Reservierungsmanager mit WhatsApp. Gäste reservieren per Nachricht, die KI erledigt den Rest. Für Restaurants im DACH-Raum.">
+<title>Gastino – Der erste Reservierungsmanager mit WhatsApp</title>
+
+<!-- Open Graph / Social Sharing -->
+<meta property="og:title" content="Gastino – Reservierungen per WhatsApp">
+<meta property="og:description" content="Ihre Gäste reservieren per WhatsApp. Automatisch. Mehrsprachig. Ohne App. Der KI-Reservierungsmanager für Restaurants.">
+<meta property="og:type" content="website">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=DM+Sans:ital,wght@0,400;0,500;1,400&display=swap" rel="stylesheet">
+<style>
+/* ─── RESET & VARIABLES ─── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+:root {
+  --white: #FAFAFA;
+  --off-white: #F2F2F0;
+  --light-gray: #E8E8E6;
+  --mid-gray: #7A7A75;
+  --dark: #1A1A18;
+  --accent: #00C9A7;
+  --accent-dim: #00A88C;
+  --accent-glow: rgba(0, 201, 167, 0.12);
+  --font-display: 'Outfit', sans-serif;
+  --font-body: 'DM Sans', sans-serif;
+}
+
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: var(--font-body);
+  background: var(--white);
+  color: var(--dark);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* ─── NAV ─── */
+nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 100;
+  padding: 20px 48px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: rgba(250, 250, 250, 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(0,0,0,0.04);
+  transition: all 0.3s ease;
+}
+
+.nav-logo {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 1.5rem;
+  color: var(--dark);
+  text-decoration: none;
+  letter-spacing: -0.5px;
+  position: relative;
+  z-index: 101;
+}
+.nav-logo span { color: var(--accent); }
+
+.nav-links {
+  display: flex;
+  align-items: center;
+  gap: 36px;
+  list-style: none;
+}
+.nav-links a {
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: var(--dark);
+  opacity: 0.7;
+  text-decoration: none;
+  transition: opacity 0.2s, transform 0.2s;
+}
+.nav-links a:hover { opacity: 1; transform: translateY(-1px); }
+
+.nav-cta {
+  background: var(--dark) !important;
+  color: var(--white) !important;
+  padding: 10px 24px !important;
+  border-radius: 100px;
+  font-weight: 600 !important;
+  opacity: 1 !important;
+  transition: all 0.3s ease !important;
+}
+.nav-cta:hover {
+  background: var(--accent) !important;
+  color: var(--dark) !important;
+  box-shadow: 0 4px 15px var(--accent-glow);
+}
+
+/* Mobile Menu Button */
+.hamburger {
+  display: none;
+  background: none;
+  border: none;
+  cursor: pointer;
+  z-index: 101;
+}
+.hamburger svg { width: 28px; height: 28px; fill: var(--dark); }
+
+/* ─── HERO ─── */
+.hero {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  align-items: center;
+  padding: 140px 48px 80px;
+  gap: 48px;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtler Background Glow */
+.hero::before {
+  content: ''; position: absolute; top: -10%; left: -10%;
+  width: 50vw; height: 50vw;
+  background: radial-gradient(circle, rgba(0,201,167,0.15) 0%, transparent 70%);
+  z-index: 0; border-radius: 50%;
+}
+.hero::after {
+  content: ''; position: absolute; bottom: 10%; right: -5%;
+  width: 40vw; height: 40vw;
+  background: radial-gradient(circle, rgba(0,201,167,0.08) 0%, transparent 70%);
+  z-index: 0; border-radius: 50%;
+}
+
+.hero-content { 
+  max-width: 600px; 
+  position: relative; 
+  z-index: 2; 
+}
+
+.hero-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--white);
+  border: 1px solid rgba(0, 201, 167, 0.3);
+  box-shadow: 0 4px 20px var(--accent-glow);
+  border-radius: 100px;
+  padding: 6px 16px;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--accent-dim);
+  margin-bottom: 32px;
+  animation: fadeInUp 0.8s ease both;
+}
+.hero-badge .dot {
+  width: 8px; height: 8px;
+  background: var(--accent);
+  border-radius: 50%;
+  animation: pulse 2s infinite;
+}
+
+.hero h1 {
+  font-family: var(--font-display);
+  font-size: clamp(2.8rem, 5vw, 4.2rem);
+  font-weight: 800;
+  line-height: 1.05;
+  letter-spacing: -1.5px;
+  color: var(--dark);
+  margin-bottom: 24px;
+  animation: fadeInUp 0.8s ease 0.1s both;
+}
+
+.hero p {
+  font-size: 1.15rem;
+  line-height: 1.65;
+  color: var(--mid-gray);
+  margin-bottom: 40px;
+  max-width: 480px;
+  animation: fadeInUp 0.8s ease 0.2s both;
+}
+
+.hero-buttons {
+  display: flex;
+  gap: 16px;
+  animation: fadeInUp 0.8s ease 0.3s both;
+}
+
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--dark);
+  color: var(--white);
+  padding: 16px 32px;
+  border-radius: 100px;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  transition: all 0.3s ease;
+  border: none;
+}
+.btn-primary:hover {
+  background: var(--accent);
+  color: var(--dark);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px var(--accent-glow);
+}
+.btn-primary svg { transition: transform 0.3s; }
+.btn-primary:hover svg { transform: translateX(4px); }
+
+.btn-secondary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--white);
+  color: var(--dark);
+  padding: 16px 32px;
+  border-radius: 100px;
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  text-decoration: none;
+  border: 1.5px solid var(--light-gray);
+  transition: all 0.3s ease;
+}
+.btn-secondary:hover {
+  border-color: var(--dark);
+  background: var(--off-white);
+  transform: translateY(-2px);
+}
+
+/* ─── PHONE MOCKUP & CHAT ─── */
+.hero-visual {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  z-index: 2;
+  animation: fadeInUp 0.8s ease 0.4s both;
+}
+
+.phone-frame {
+  width: 320px;
+  height: 640px;
+  background: var(--dark);
+  border-radius: 44px;
+  padding: 10px;
+  box-shadow:
+    0 40px 80px rgba(0,0,0,0.15),
+    0 0 0 1px rgba(0,0,0,0.06),
+    inset 0 0 0 2px rgba(255,255,255,0.1);
+  position: relative;
+}
+
+.phone-notch {
+  width: 120px; height: 26px;
+  background: var(--dark);
+  border-radius: 0 0 18px 18px;
+  position: absolute; top: 10px; left: 50%;
+  transform: translateX(-50%);
+  z-index: 10;
+}
+
+.phone-screen {
+  width: 100%; height: 100%;
+  background: #FFFFFF;
+  border-radius: 34px;
+  overflow: hidden;
+  position: relative;
+}
+
+.chat-sim {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-header {
+  background: #075E54;
+  padding: 42px 16px 14px;
+  display: flex; align-items: center; gap: 12px;
+  box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+  z-index: 2;
+}
+.chat-avatar {
+  width: 38px; height: 38px;
+  border-radius: 50%;
+  background: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-display); font-weight: 700; font-size: 1rem; color: white;
+}
+.chat-header-info { flex: 1; }
+.chat-header-name { color: white; font-weight: 600; font-size: 0.9rem; }
+.chat-header-status { color: rgba(255,255,255,0.8); font-size: 0.7rem; margin-top: 2px;}
+
+.chat-body {
+  flex: 1;
+  background: #E5DDD5;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d4cfc6' fill-opacity='0.25'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  padding: 16px 12px;
+  overflow-y: auto;
+  display: flex; flex-direction: column; gap: 8px;
+  scroll-behavior: smooth;
+}
+.chat-body::-webkit-scrollbar { display: none; }
+
+.msg {
+  max-width: 85%;
+  padding: 8px 12px;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  line-height: 1.4;
+  position: relative;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+  opacity: 0;
+  transform: translateY(10px);
+}
+.msg-in {
+  background: white;
+  align-self: flex-start;
+  border-top-left-radius: 4px;
+}
+.msg-out {
+  background: #DCF8C6;
+  align-self: flex-end;
+  border-top-right-radius: 4px;
+}
+.msg-time {
+  font-size: 0.55rem;
+  color: rgba(0,0,0,0.45);
+  text-align: right;
+  margin-top: 4px;
+  float: right;
+  margin-left: 10px;
+}
+
+.typing-indicator {
+  align-self: flex-start;
+  background: white;
+  padding: 12px 16px;
+  border-radius: 12px;
+  border-top-left-radius: 4px;
+  display: flex; gap: 4px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.1);
+}
+.typing-indicator span {
+  width: 6px; height: 6px;
+  background: #90949c;
+  border-radius: 50%;
+  animation: typingBounce 1.4s infinite;
+}
+.typing-indicator span:nth-child(2) { animation-delay: 0.2s; }
+.typing-indicator span:nth-child(3) { animation-delay: 0.4s; }
+
+.chat-input {
+  background: #F0F0F0;
+  padding: 10px;
+  display: flex; align-items: center; gap: 10px;
+  z-index: 2;
+}
+.chat-input-field {
+  flex: 1;
+  background: white;
+  border-radius: 20px;
+  padding: 10px 16px;
+  font-size: 0.8rem;
+  color: var(--mid-gray);
+}
+.chat-send {
+  width: 36px; height: 36px;
+  background: var(--accent);
+  border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+}
+
+/* Floating Stats */
+.float-card {
+  position: absolute;
+  background: white;
+  border-radius: 16px;
+  padding: 16px 20px;
+  box-shadow: 0 12px 30px rgba(0,0,0,0.08), 0 0 0 1px rgba(0,0,0,0.02);
+  z-index: 3;
+  animation: float 6s ease-in-out infinite;
+}
+.float-card-1 { top: 15%; right: -40px; animation-delay: 0s; }
+.float-card-2 { bottom: 20%; left: -50px; animation-delay: 2s; }
+.float-stat { font-family: var(--font-display); font-size: 1.5rem; font-weight: 800; color: var(--dark); }
+.float-label { font-size: 0.75rem; color: var(--mid-gray); margin-top: 2px; }
+
+/* ─── FEATURES ─── */
+.features { padding: 120px 48px; background: var(--off-white); }
+.features-header { text-align: center; max-width: 650px; margin: 0 auto 72px; }
+.features-header h2 {
+  font-family: var(--font-display);
+  font-size: clamp(2rem, 3.5vw, 2.8rem);
+  font-weight: 800; letter-spacing: -1px; margin-bottom: 16px;
+}
+.features-header p { font-size: 1.1rem; color: var(--mid-gray); line-height: 1.6; }
+
+.features-grid {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px;
+  max-width: 1150px; margin: 0 auto;
+}
+.feature-card {
+  background: var(--white);
+  border-radius: 20px;
+  padding: 40px 32px;
+  border: 1px solid rgba(0,0,0,0.03);
+  transition: all 0.4s ease;
+  position: relative; overflow: hidden;
+}
+.feature-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 4px;
+  background: var(--accent); transform: scaleX(0); transform-origin: left;
+  transition: transform 0.4s ease;
+}
+.feature-card:hover { transform: translateY(-5px); box-shadow: 0 20px 40px rgba(0,0,0,0.06); }
+.feature-card:hover::before { transform: scaleX(1); }
+
+.feature-icon {
+  width: 52px; height: 52px;
+  background: var(--accent-glow);
+  border-radius: 14px;
+  display: flex; align-items: center; justify-content: center;
+  margin-bottom: 24px; font-size: 1.5rem;
+}
+.feature-card h3 { font-family: var(--font-display); font-size: 1.2rem; font-weight: 700; margin-bottom: 12px; }
+.feature-card p { font-size: 0.95rem; line-height: 1.6; color: var(--mid-gray); }
+
+/* ─── PROOF / NUMBERS ─── */
+.proof { padding: 80px 48px; background: var(--white); text-align: center; }
+.proof-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 40px; max-width: 1000px; margin: 0 auto; }
+.proof-item h3 { font-family: var(--font-display); font-size: clamp(2.5rem, 4vw, 3.5rem); font-weight: 800; color: var(--dark); letter-spacing: -1px; }
+.proof-item h3 span { color: var(--accent); }
+.proof-item p { font-size: 0.9rem; font-weight: 500; color: var(--mid-gray); margin-top: 8px; text-transform: uppercase; letter-spacing: 1px; }
+
+/* ─── HOW IT WORKS ─── */
+.how { padding: 120px 48px; background: var(--dark); color: var(--white); }
+.how-header { text-align: center; max-width: 600px; margin: 0 auto 72px; }
+.how-header h2 { font-family: var(--font-display); font-size: clamp(2rem, 3.5vw, 2.8rem); font-weight: 800; margin-bottom: 16px; }
+.how-header p { font-size: 1.1rem; color: rgba(255,255,255,0.6); }
+
+.how-steps { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; max-width: 1050px; margin: 0 auto; }
+.how-step { text-align: center; position: relative; }
+.how-step-num { font-family: var(--font-display); font-size: 4.5rem; font-weight: 800; color: var(--accent); opacity: 0.2; line-height: 1; margin-bottom: 20px; }
+.how-step h3 { font-family: var(--font-display); font-size: 1.3rem; font-weight: 700; margin-bottom: 12px; }
+.how-step p { font-size: 0.95rem; color: rgba(255,255,255,0.6); line-height: 1.6; }
+
+/* ─── PRICING ─── */
+.pricing { padding: 120px 48px; background: var(--off-white); }
+.pricing-header { text-align: center; max-width: 600px; margin: 0 auto 72px; }
+.pricing-header h2 { font-family: var(--font-display); font-size: clamp(2rem, 3.5vw, 2.8rem); font-weight: 800; margin-bottom: 16px; }
+.pricing-header p { font-size: 1.1rem; color: var(--mid-gray); }
+
+.pricing-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; max-width: 1100px; margin: 0 auto; }
+.price-card { background: var(--white); border: 1px solid var(--light-gray); border-radius: 24px; padding: 48px 40px; transition: all 0.3s ease; display: flex; flex-direction: column; }
+.price-card:hover { transform: translateY(-4px); box-shadow: 0 15px 30px rgba(0,0,0,0.05); }
+.price-card.featured { border-color: var(--accent); background: linear-gradient(180deg, rgba(0,201,167,0.03) 0%, var(--white) 100%); position: relative; }
+.price-card.featured::after {
+  content: 'Beliebt'; position: absolute; top: -14px; right: 32px;
+  background: var(--accent); color: var(--white); font-family: var(--font-display);
+  font-size: 0.75rem; font-weight: 700; padding: 6px 16px; border-radius: 100px;
+  text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 4px 10px var(--accent-glow);
+}
+
+.price-name { font-family: var(--font-display); font-size: 0.9rem; font-weight: 700; color: var(--mid-gray); text-transform: uppercase; letter-spacing: 1px; margin-bottom: 12px; }
+.price-amount { font-family: var(--font-display); font-size: 3.5rem; font-weight: 800; letter-spacing: -2px; margin-bottom: 8px; color: var(--dark); }
+.price-amount span { font-size: 1.1rem; font-weight: 500; color: var(--mid-gray); letter-spacing: 0; }
+.price-desc { font-size: 0.95rem; color: var(--mid-gray); margin-bottom: 32px; }
+
+.price-features { list-style: none; margin-bottom: 40px; flex: 1; }
+.price-features li { padding: 10px 0; font-size: 0.95rem; color: var(--dark); display: flex; align-items: center; gap: 12px; }
+.price-features li::before { content: '✓'; color: var(--accent); font-weight: 800; font-size: 1rem; }
+
+.price-cta { display: block; text-align: center; padding: 16px; border-radius: 100px; font-family: var(--font-display); font-weight: 700; font-size: 1rem; text-decoration: none; transition: all 0.3s; }
+.price-cta-dark { background: var(--dark); color: var(--white); }
+.price-cta-dark:hover { background: var(--accent); color: var(--dark); }
+.price-cta-outline { border: 2px solid var(--light-gray); color: var(--dark); }
+.price-cta-outline:hover { border-color: var(--dark); background: var(--dark); color: var(--white); }
+
+/* ─── CTA ─── */
+.cta-section { padding: 120px 48px; background: var(--white); text-align: center; }
+.cta-section h2 { font-family: var(--font-display); font-size: clamp(2rem, 4vw, 3rem); font-weight: 800; letter-spacing: -1px; margin-bottom: 20px; }
+.cta-section p { font-size: 1.15rem; color: var(--mid-gray); margin-bottom: 40px; max-width: 500px; margin-left: auto; margin-right: auto; line-height: 1.6; }
+
+/* ─── FOOTER ─── */
+footer { padding: 60px 48px 40px; border-top: 1px solid var(--light-gray); background: var(--white); display: flex; flex-direction: column; gap: 24px; }
+.footer-top { display: flex; justify-content: space-between; align-items: center; width: 100%; }
+.footer-logo { font-family: var(--font-display); font-weight: 800; font-size: 1.4rem; color: var(--dark); }
+.footer-logo span { color: var(--accent); }
+.footer-links { display: flex; gap: 32px; }
+.footer-links a { font-size: 0.9rem; color: var(--mid-gray); text-decoration: none; transition: color 0.2s; font-weight: 500; }
+.footer-links a:hover { color: var(--accent); }
+.footer-bottom { border-top: 1px solid var(--light-gray); padding-top: 24px; text-align: center; font-size: 0.85rem; color: var(--mid-gray); display: flex; justify-content: space-between; align-items: center; }
+
+/* ─── LANGUAGE TOGGLE ─── */
+.lang-toggle { display: flex; background: var(--off-white); border-radius: 10px; overflow: hidden; font-size: 0.8rem; font-family: var(--font-display); font-weight: 700; border: 1px solid var(--light-gray); }
+.lang-toggle button { padding: 8px 14px; border: none; background: transparent; cursor: pointer; color: var(--mid-gray); transition: all 0.2s; }
+.lang-toggle button.active { background: var(--dark); color: var(--white); }
+
+/* ─── ANIMATIONS ─── */
+@keyframes fadeInUp { from { opacity: 0; transform: translateY(30px); } to { opacity: 1; transform: translateY(0); } }
+@keyframes pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.8); } }
+@keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+@keyframes typingBounce { 0%, 60%, 100% { transform: translateY(0); } 30% { transform: translateY(-5px); } }
+@keyframes msgAppear { from { opacity: 0; transform: translateY(15px); } to { opacity: 1; transform: translateY(0); } }
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 992px) {
+  .hero { grid-template-columns: 1fr; padding: 140px 24px 80px; text-align: center; }
+  .hero-content { margin: 0 auto; display: flex; flex-direction: column; align-items: center; }
+  .hero::before, .hero::after { display: none; } /* Less clutter on mobile */
+  .hero-buttons { justify-content: center; width: 100%; flex-wrap: wrap; }
+  .hero-visual { margin-top: 40px; }
+  .float-card { display: none; } /* Hide floating elements on smaller screens to prevent overflow */
+  .features, .proof, .how, .pricing, .cta-section { padding: 80px 24px; }
+  .features-grid { grid-template-columns: 1fr 1fr; }
+  .proof-grid { grid-template-columns: repeat(2, 1fr); gap: 32px; }
+  .how-steps { grid-template-columns: 1fr; max-width: 450px; }
+  .pricing-cards { grid-template-columns: 1fr; max-width: 450px; }
+  .footer-top { flex-direction: column; gap: 24px; text-align: center; }
+  .footer-links { flex-wrap: wrap; justify-content: center; }
+  .footer-bottom { flex-direction: column; gap: 12px; }
+}
+
+@media (max-width: 768px) {
+  nav { padding: 16px 24px; }
+  .hamburger { display: block; }
+  .nav-links {
+    position: absolute; top: 100%; left: 0; right: 0;
+    background: var(--white); flex-direction: column; gap: 24px;
+    padding: 32px 24px; box-shadow: 0 10px 20px rgba(0,0,0,0.05);
+    clip-path: polygon(0 0, 100% 0, 100% 0, 0 0);
+    transition: clip-path 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .nav-links.active { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); }
+  .features-grid { grid-template-columns: 1fr; max-width: 450px; }
+}
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<nav>
+  <a href="#" class="nav-logo" aria-label="Zur Startseite">gastino</a>
+  
+  <button class="hamburger" aria-label="Menü öffnen" onclick="document.querySelector('.nav-links').classList.toggle('active')">
+    <svg viewBox="0 0 24 24"><path d="M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z"/></svg>
+  </button>
+
+  <ul class="nav-links">
+    <li><a href="#features" onclick="document.querySelector('.nav-links').classList.remove('active')">Features</a></li>
+    <li><a href="#how" onclick="document.querySelector('.nav-links').classList.remove('active')">So funktioniert's</a></li>
+    <li><a href="#pricing" onclick="document.querySelector('.nav-links').classList.remove('active')">Preise</a></li>
+    <li><a href="mailto:info@gastino.eu" class="nav-cta" onclick="document.querySelector('.nav-links').classList.remove('active')">Jetzt starten</a></li>
+  </ul>
+</nav>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="hero-content">
+    <div class="hero-badge">
+      <span class="dot"></span>
+      Der erste Reservierungsmanager mit WhatsApp
+    </div>
+    <h1>Ihre Gäste reservieren per WhatsApp. Automatisch.</h1>
+    <p>Gastino nimmt Reservierungen über WhatsApp entgegen, prüft die Verfügbarkeit und weist Tische zu — rund um die Uhr. Kein verpasster Anruf mehr.</p>
+    <div class="hero-buttons">
+      <a href="mailto:info@gastino.eu" class="btn-primary">
+        Jetzt starten
+        <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+      </a>
+      <a href="#how" class="btn-secondary">So funktioniert's</a>
+    </div>
+  </div>
+
+  <div class="hero-visual">
+    <!-- Dashboard Preview behind phone -->
+    <div style="position:relative;">
+      <div style="position:absolute; top:50%; left:50%; transform:translate(-60%,-50%); width:700px; height:420px; background:var(--off-white); border-radius:16px; border:1px solid var(--light-gray); box-shadow:0 20px 60px rgba(0,0,0,0.08); overflow:hidden; opacity:0.6;">
+        <div style="padding:12px 16px; background:white; border-bottom:1px solid var(--light-gray); display:flex; align-items:center; gap:12px;">
+          <span style="font-family:var(--font-display); font-weight:800; font-size:0.8rem;">gastino</span>
+          <span style="color:var(--accent); font-size:0.7rem; font-weight:600; background:rgba(0,201,167,0.1); padding:2px 8px; border-radius:4px;">RESERVIERUNGEN</span>
+        </div>
+        <div style="padding:16px; display:grid; grid-template-columns:repeat(4,1fr); gap:8px;">
+          <div style="background:white; border-radius:8px; padding:10px; text-align:center;"><span style="font-family:var(--font-display); font-weight:800; font-size:1.2rem;">7</span><br><span style="font-size:0.6rem; color:var(--mid-gray);">Heute</span></div>
+          <div style="background:white; border-radius:8px; padding:10px; text-align:center;"><span style="font-family:var(--font-display); font-weight:800; font-size:1.2rem;">6</span><br><span style="font-size:0.6rem; color:var(--mid-gray);">Erwartet</span></div>
+          <div style="background:white; border-radius:8px; padding:10px; text-align:center;"><span style="font-family:var(--font-display); font-weight:800; font-size:1.2rem;">1</span><br><span style="font-size:0.6rem; color:var(--mid-gray);">Gesetzt</span></div>
+          <div style="background:white; border-radius:8px; padding:10px; text-align:center;"><span style="font-family:var(--font-display); font-weight:800; font-size:1.2rem;">28</span><br><span style="font-size:0.6rem; color:var(--mid-gray);">Gäste</span></div>
+        </div>
+        <div style="padding:0 16px;">
+          <div style="background:white; border-radius:8px; padding:8px 12px; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center; font-size:0.65rem;"><span style="font-weight:600;">Tisch 1 · Sig. Rossi (2)</span><span style="color:var(--accent);">19:30</span></div>
+          <div style="background:white; border-radius:8px; padding:8px 12px; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center; font-size:0.65rem;"><span style="font-weight:600;">Tisch 5 · Hofer Familie (4)</span><span style="color:var(--accent);">19:00</span></div>
+          <div style="background:white; border-radius:8px; padding:8px 12px; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center; font-size:0.65rem;"><span style="font-weight:600;">Tisch 3 · Fischer (2)</span><span style="color:var(--accent);">20:00</span></div>
+          <div style="background:white; border-radius:8px; padding:8px 12px; margin-bottom:4px; display:flex; justify-content:space-between; align-items:center; font-size:0.65rem;"><span style="font-weight:600;">Tisch 7 · Mair Feier (6)</span><span style="color:var(--accent);">20:00</span></div>
+        </div>
+      </div>
+      
+      <!-- Floating stats -->
+      <div class="float-card float-card-1">
+        <div class="float-stat">0<span style="color:var(--accent)">✗</span></div>
+        <div class="float-label">Verpasste Anrufe</div>
+      </div>
+      <div class="float-card float-card-2">
+        <div class="float-stat" style="font-size:1.3rem;">24/7</div>
+        <div class="float-label">Immer erreichbar</div>
+      </div>
+
+      <!-- Phone with live chat simulation -->
+      <div class="phone-frame" style="position:relative; z-index:5;">
+        <div class="phone-notch"></div>
+        <div class="phone-screen">
+          <div class="chat-sim">
+            <div class="chat-header">
+              <div class="chat-avatar">G</div>
+              <div class="chat-header-info">
+                <div class="chat-header-name">Ristorante Sonnenhof</div>
+                <div class="chat-header-status">Gastino · Online</div>
+              </div>
+            </div>
+            <div class="chat-body" id="chatBody">
+              <!-- Messages injected by JS -->
+            </div>
+            <div class="chat-input">
+              <div class="chat-input-field">Nachricht schreiben...</div>
+              <div class="chat-send">
+                <svg width="16" height="16" fill="white" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="features" id="features">
+  <div class="features-header">
+    <h2>Alles was Ihr Restaurant braucht.</h2>
+    <p>Von der Reservierungsanfrage bis zum Tischplan. Gastino ersetzt Ihr Papierbuch und das klingelnde Telefon — Sie konzentrieren sich auf Ihre Gäste.</p>
+  </div>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="feature-icon">💬</div>
+      <h3>WhatsApp-Reservierungen</h3>
+      <p>Gäste schreiben einfach per WhatsApp. Die KI versteht natürliche Sprache, prüft Verfügbarkeit und bestätigt den Tisch — alles automatisch.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📋</div>
+      <h3>Digitaler Tischplan</h3>
+      <p>Echtzeit-Übersicht aller Tische, Zonen und Reservierungen. Sehen Sie auf einen Blick wer kommt, wer sitzt und wo noch Platz ist.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🚀</div>
+      <h3>Keine verpassten Anrufe</h3>
+      <p>Abends klingelt das Telefon, die Küche ist voll und niemand kann abnehmen. Mit Gastino buchen Gäste per WhatsApp — auch um 23 Uhr.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🌍</div>
+      <h3>Mehrsprachig</h3>
+      <p>Deutsch, Italienisch, Englisch — Gastino erkennt die Sprache automatisch und antwortet im perfekten Tonfall. Ideal für touristische Regionen.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📊</div>
+      <h3>Dashboard & Statistiken</h3>
+      <p>Auslastung, No-Show-Rate, Reservierungsquellen — alles auf einen Blick. Web-basiert, von überall erreichbar, keine Installation nötig.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">⭐</div>
+      <h3>Keine Provision</h3>
+      <p>Anders als TheFork oder OpenTable: keine Provision pro Gast, keine versteckten Kosten. Einfach eine faire Monatspauschale.</p>
+    </div>
+  </div>
+</section>
+
+<!-- PROOF -->
+<section class="proof">
+  <div class="proof-grid">
+    <div class="proof-item">
+      <h3><span>&lt;</span>30s</h3>
+      <p>Antwortzeit</p>
+    </div>
+    <div class="proof-item">
+      <h3>24<span>/7</span></h3>
+      <p>Immer Erreichbar</p>
+    </div>
+    <div class="proof-item">
+      <h3>0<span>h</span></h3>
+      <p>Täglicher Aufwand</p>
+    </div>
+    <div class="proof-item">
+      <h3>0<span>€</span></h3>
+      <p>Einrichtung (Aktion)</p>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="how" id="how">
+  <div class="how-header">
+    <h2>In 3 einfachen Schritten live.</h2>
+    <p>Sie benötigen kein technisches Vorwissen. Wir richten Ihren digitalen Mitarbeiter schlüsselfertig ein.</p>
+  </div>
+  <div class="how-steps">
+    <div class="how-step">
+      <div class="how-step-num">01</div>
+      <h3>Restaurant einrichten</h3>
+      <p>Tische, Öffnungszeiten, Speisekarte — Sie geben uns die Basics. Das dauert 15 Minuten, den Rest erledigen wir.</p>
+    </div>
+    <div class="how-step">
+      <div class="how-step-num">02</div>
+      <h3>WhatsApp verbinden</h3>
+      <p>Ihre Gäste schreiben an Ihre WhatsApp-Nummer. Gastino antwortet sofort, prüft die Verfügbarkeit und reserviert automatisch.</p>
+    </div>
+    <div class="how-step">
+      <div class="how-step-num">03</div>
+      <h3>Zurücklehnen</h3>
+      <p>Sie sehen alle Reservierungen im Dashboard. Änderungen, Stornierungen, Statistiken — alles an einem Ort. Sie kochen, Gastino organisiert.</p>
+    </div>
+  </div>
+</section>
+
+<!-- PRICING -->
+<section class="pricing" id="pricing">
+  <div class="pricing-header">
+    <h2>Faire Preise. Ohne Provision.</h2>
+    <p>Keine Kosten pro Gast. Keine versteckten Gebühren. Wird jährlich abgerechnet.</p>
+  </div>
+  <div class="pricing-cards">
+    <div class="price-card">
+      <div class="price-name">Starter</div>
+      <div class="price-amount">€39 <span>/Monat (jährl.)</span></div>
+      <div class="price-desc">€468/Jahr · Perfekt für kleine Restaurants</div>
+      <ul class="price-features">
+        <li>Reservierungssystem & Dashboard</li>
+        <li>Telegram-Bot mit KI</li>
+        <li>Automatische Tischzuweisung</li>
+        <li>Deutsch + 1 Sprache</li>
+        <li>E-Mail Support</li>
+      </ul>
+      <a href="mailto:info@gastino.eu" class="price-cta price-cta-outline">Jetzt starten</a>
+    </div>
+    <div class="price-card featured">
+      <div class="price-name">Professional</div>
+      <div class="price-amount">€89 <span>/Monat (jährl.)</span></div>
+      <div class="price-desc">€890/Jahr (2 Monate gratis) · Mit WhatsApp</div>
+      <ul class="price-features">
+        <li>Alles aus Starter</li>
+        <li>WhatsApp-Bot mit KI</li>
+        <li>Proaktive Erinnerungen</li>
+        <li>No-Show-Tracking</li>
+        <li>DE, IT, EN</li>
+        <li>Priority Support</li>
+      </ul>
+      <a href="mailto:info@gastino.eu" class="price-cta price-cta-dark">Jetzt starten</a>
+    </div>
+    <div class="price-card">
+      <div class="price-name">Enterprise</div>
+      <div class="price-amount" style="font-size:2.2rem;">Individuell</div>
+      <div class="price-desc">Für Hotels & große Betriebe</div>
+      <ul class="price-features">
+        <li>Alles aus Professional</li>
+        <li>PMS-Integration (ASA, Protel)</li>
+        <li>Multi-Property</li>
+        <li>Unbegrenzte Sprachen</li>
+        <li>Dedizierter Account Manager</li>
+      </ul>
+      <a href="mailto:info@gastino.eu" class="price-cta price-cta-outline">Kontaktieren</a>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="cta-section" id="cta">
+  <h2>Schluss mit verpassten Reservierungen.</h2>
+  <p>Starten Sie jetzt und erleben Sie, wie Gastino Ihren Betrieb verändert.</p>
+  <a href="mailto:info@gastino.eu" class="btn-primary" style="display:inline-flex; font-size: 1.1rem; padding: 18px 40px;">
+    Jetzt starten
+    <svg width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" viewBox="0 0 24 24"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+  </a>
+</section>
+
+<!-- IMPRESSUM -->
+<section id="impressum" style="display:none; padding: 120px 48px; max-width: 800px; margin: 0 auto;">
+  <h2 style="font-family: var(--font-display); font-size: 2rem; font-weight: 800; margin-bottom: 24px;">Impressum</h2>
+  <p><strong>Angaben gemäß Art. 7 D.Lgs. 70/2003 und Art. 2 Abs. 2 DPR 633/72:</strong></p>
+  <br>
+  <p><strong>Fabian Malfertheiner</strong><br>
+  Pstossweg 13<br>
+  39040 Kastelruth (BZ)<br>
+  Italien</p>
+  <br>
+  <p><strong>Kontakt:</strong><br>
+  E-Mail: info@gastino.eu</p>
+  <br>
+  <p><strong>Umsatzsteuer-ID (Partita IVA):</strong> IT03331840219<br>
+  <strong>Steuernummer (Codice Fiscale):</strong> MLFFBN96S06B160S</p>
+  <br>
+  <p><strong>Verantwortlich für den Inhalt:</strong> Fabian Malfertheiner</p>
+  <br>
+  <p><strong>Streitbeilegung:</strong> Die Europäische Kommission stellt eine Plattform zur Online-Streitbeilegung (OS) bereit: <a href="https://ec.europa.eu/consumers/odr" target="_blank">https://ec.europa.eu/consumers/odr</a>. Wir sind nicht verpflichtet und nicht bereit, an einem Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.</p>
+</section>
+
+<!-- DATENSCHUTZ -->
+<section id="datenschutz" style="display:none; padding: 120px 48px; max-width: 800px; margin: 0 auto; line-height: 1.8;">
+  <h2 style="font-family: var(--font-display); font-size: 2rem; font-weight: 800; margin-bottom: 24px;">Datenschutzerklärung (Informativa Privacy)</h2>
+  <p><strong>Gemäß Art. 13 und 14 der Verordnung (EU) 2016/679 (DSGVO) und Art. 13 D.Lgs. 196/2003</strong></p>
+  <br>
+  <h3 style="font-family: var(--font-display); font-weight: 700; margin: 20px 0 10px;">1. Verantwortlicher (Titolare del Trattamento)</h3>
+  <p>Fabian Malfertheiner, Pstossweg 13, 39040 Kastelruth (BZ), Italien. E-Mail: info@gastino.eu</p>
+  
+  <h3 style="font-family: var(--font-display); font-weight: 700; margin: 20px 0 10px;">2. Welche Daten wir erheben</h3>
+  <p>Bei der Nutzung von Gastino können folgende Daten verarbeitet werden: Name, Telefonnummer (WhatsApp/Telegram), Nachrichteninhalte, Reservierungsdaten (Datum, Uhrzeit, Personenanzahl), IP-Adresse bei Website-Besuch, E-Mail-Adresse bei Kontaktaufnahme.</p>
+  
+  <h3 style="font-family: var(--font-display); font-weight: 700; margin: 20px 0 10px;">3. Zweck und Rechtsgrundlage</h3>
+  <p>Die Datenverarbeitung erfolgt zum Zweck der Reservierungsverwaltung und Gästekommunikation (Art. 6 Abs. 1 lit. b DSGVO — Vertragserfüllung), zur Beantwortung von Anfragen (Art. 6 Abs. 1 lit. f DSGVO — berechtigtes Interesse), sowie zur Verbesserung unseres Dienstes.</p>
+  
+  <h3 style="font-family: var(--font-display); font-weight: 700; margin: 20px 0 10px;">4. Empfänger und Drittlandtransfer</h3>
+  <p>Zur Erbringung unserer Dienstleistung setzen wir folgende Auftragsverarbeiter (Responsabili del Trattamento) ein: Groq Inc. (USA) für KI-Sprachverarbeitung, Render Inc. (USA) für Hosting, Meta Platforms (WhatsApp Business API). Für Transfers in Drittländer gelten die EU-Standardvertragsklauseln gemäß Art. 46 Abs. 2 lit. c DSGVO bzw. das EU-US Data Privacy Framework.</p>
+  
+  <h3 style="font-family: var(--font-display); font-weight: 700; margin: 20px 0 10px;">5. Speicherdauer</h3>
+  <p>Personenbezogene Daten werden für die Dauer der Geschäftsbeziehung gespeichert und danach gemäß gesetzlicher Aufbewahrungsfristen (max. 10 Jahre für steuerrelevante Daten). Konversationsdaten werden nach 12 Monaten Inaktivität gelöscht.</p>
+  
+  <h3 style="font-family: var(--font-display); font-weight: 700; margin: 20px 0 10px;">6. Ihre Rechte</h3>
+  <p>Sie haben das Recht auf: Auskunft (Art. 15 DSGVO), Berichtigung (Art. 16), Löschung (Art. 17), Einschränkung der Verarbeitung (Art. 18), Datenübertragbarkeit (Art. 20), Widerspruch (Art. 21). Zur Ausübung Ihrer Rechte kontaktieren Sie uns unter info@gastino.eu. Sie haben zudem das Recht auf Beschwerde bei der italienischen Datenschutzbehörde: Garante per la Protezione dei Dati Personali, www.garanteprivacy.it.</p>
+  
+  <h3 style="font-family: var(--font-display); font-weight: 700; margin: 20px 0 10px;">7. Cookies</h3>
+  <p>Diese Website verwendet keine Cookies und kein Tracking.</p>
+</section>
+
+<!-- AGB -->
+<section id="agb" style="display:none; padding: 120px 48px; max-width: 800px; margin: 0 auto; line-height: 1.8;">
+  <h2 style="font-family: var(--font-display); font-size: 2rem; font-weight: 800; margin-bottom: 24px;">Allgemeine Geschäftsbedingungen</h2>
+  <p><strong>Gemäß Art. 1341 und 1342 Codice Civile und D.Lgs. 206/2005 (Codice del Consumo)</strong></p>
+  <br>
+  <h3 style="font-family: var(--font-display); font-weight: 700; margin: 20px 0 10px;">1. Geltungsbereich</h3>
+  <p>Diese AGB gelten für alle Verträge zwischen Fabian Malfertheiner (nachfolgend "Gastino") und dem Kunden über die Nutzung der Gastino-Software zur Reservierungsverwaltung und Gästekommunikation.</p>
+  
+  <h3 style="font-family: var(--font-display); font-weight: 700; margin: 20px 0 10px;">2. Leistungsbeschreibung</h3>
+  <p>Gastino stellt eine cloudbasierte Software (SaaS) zur Verfügung, die automatisierte Reservierungsverwaltung über WhatsApp, Telegram und ein Web-Dashboard umfasst. Der Funktionsumfang richtet sich nach dem gewählten Tarif.</p>
+  
+  <h3 style="font-family: var(--font-display); font-weight: 700; margin: 20px 0 10px;">3. Vertragsschluss und Laufzeit</h3>
+  <p>Der Vertrag kommt durch die Registrierung und Bestätigung durch Gastino zustande. Die Mindestlaufzeit beträgt 12 Monate bei jährlicher Abrechnung. Der Vertrag verlängert sich automatisch um weitere 12 Monate, sofern nicht 30 Tage vor Ablauf schriftlich gekündigt wird.</p>
+  
+  <h3 style="font-family: var(--font-display); font-weight: 700; margin: 20px 0 10px;">4. Preise und Zahlung</h3>
+  <p>Die Preise richten sich nach der aktuellen Preisliste auf der Website. Alle Preise verstehen sich zuzüglich der gesetzlichen MwSt. (IVA). Die Zahlung erfolgt jährlich im Voraus per Banküberweisung oder Kreditkarte.</p>
+  
+  <h3 style="font-family: var(--font-display); font-weight: 700; margin: 20px 0 10px;">5. Verfügbarkeit</h3>
+  <p>Gastino bemüht sich um eine Verfügbarkeit von 99% im Jahresmittel. Geplante Wartungsarbeiten werden mindestens 48 Stunden im Voraus angekündigt. Für Ausfälle durch höhere Gewalt oder Drittanbieter (Meta, Telegram) übernimmt Gastino keine Haftung.</p>
+  
+  <h3 style="font-family: var(--font-display); font-weight: 700; margin: 20px 0 10px;">6. Datenschutz</h3>
+  <p>Gastino verarbeitet personenbezogene Daten im Auftrag des Kunden gemäß einer separaten Auftragsverarbeitungsvereinbarung (DPA) nach Art. 28 DSGVO. Der Kunde bleibt Verantwortlicher (Titolare) für die Daten seiner Gäste.</p>
+  
+  <h3 style="font-family: var(--font-display); font-weight: 700; margin: 20px 0 10px;">7. Haftung</h3>
+  <p>Die Haftung von Gastino ist auf Vorsatz und grobe Fahrlässigkeit beschränkt. Für indirekte Schäden, entgangenen Gewinn oder Datenverlust haftet Gastino nicht. Die maximale Haftung ist auf den Jahresbetrag des jeweiligen Vertrags begrenzt.</p>
+  
+  <h3 style="font-family: var(--font-display); font-weight: 700; margin: 20px 0 10px;">8. Kündigung</h3>
+  <p>Beide Parteien können den Vertrag mit einer Frist von 30 Tagen zum Ende der Vertragslaufzeit kündigen. Eine außerordentliche Kündigung ist bei schwerwiegenden Vertragsverletzungen nach erfolgloser Abmahnung möglich.</p>
+  
+  <h3 style="font-family: var(--font-display); font-weight: 700; margin: 20px 0 10px;">9. Anwendbares Recht und Gerichtsstand</h3>
+  <p>Es gilt italienisches Recht. Gerichtsstand ist Bozen (Tribunale di Bolzano), sofern gesetzlich zulässig.</p>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-top">
+    <div class="footer-logo">gastino</div>
+    <div class="footer-links">
+      <a href="#" onclick="event.preventDefault();toggleLegal('impressum')">Impressum</a>
+      <a href="#" onclick="event.preventDefault();toggleLegal('datenschutz')">Datenschutz</a>
+      <a href="#" onclick="event.preventDefault();toggleLegal('agb')">AGB</a>
+      <a href="mailto:info@gastino.eu">Kontakt</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2026 Gastino · Entwickelt in Südtirol</span>
+    <span>Mehr Zeit für echte Gastfreundschaft.</span>
+  </div>
+</footer>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+// ─── CHAT SIMULATION LOGIC ───
+const chatBody = document.getElementById('chatBody');
+
+const conversation = [
+  { type: 'in', text: 'Hallo! Habt ihr morgen Abend noch einen Tisch frei für 4 Personen? 😊', readingDelay: 1500, typeDelay: 0 },
+  { type: 'out', text: 'Hallo! Ja, morgen Abend haben wir noch Platz für 4 Personen. Um welche Uhrzeit möchtet ihr kommen?', readingDelay: 2000, typeDelay: 1200 },
+  { type: 'in', text: 'So gegen 20 Uhr, auf den Namen Müller bitte', readingDelay: 1800, typeDelay: 0 },
+  { type: 'out', text: 'Perfekt! Reservierung bestätigt: Morgen um 20:00 Uhr, 4 Personen auf den Namen Müller. Tisch 3 im Innenbereich. Wir freuen uns auf euch! 🍽️', readingDelay: 2500, typeDelay: 1500 },
+  { type: 'in', text: 'Super, danke! Gibt es bei euch auch glutenfreie Optionen?', readingDelay: 2500, typeDelay: 0 },
+  { type: 'out', text: 'Selbstverständlich! Wir haben mehrere glutenfreie Hauptgerichte, z.B. den Hirschragout mit Polenta. Sagt einfach beim Service Bescheid, wir beraten euch gerne. Bis morgen! 😊', readingDelay: 4000, typeDelay: 1000 },
+];
+
+function getFormattedTime() {
+  const now = new Date();
+  return `${now.getHours()}:${String(now.getMinutes()).padStart(2, '0')}`;
+}
+
+async function showTyping(delay) {
+  return new Promise(resolve => {
+    const typing = document.createElement('div');
+    typing.className = 'typing-indicator';
+    typing.innerHTML = '<span></span><span></span><span></span>';
+    chatBody.appendChild(typing);
+    chatBody.scrollTo({ top: chatBody.scrollHeight, behavior: 'smooth' });
+    
+    setTimeout(() => {
+      typing.remove();
+      resolve();
+    }, delay);
+  });
+}
+
+async function showMessage(msgObj) {
+  return new Promise(resolve => {
+    const msg = document.createElement('div');
+    msg.className = `msg msg-${msgObj.type}`;
+    msg.innerHTML = `${msgObj.text}<div class="msg-time">${getFormattedTime()}</div>`;
+    chatBody.appendChild(msg);
+    
+    // Trigger animation via CSS
+    requestAnimationFrame(() => {
+      msg.style.animation = 'msgAppear 0.4s ease forwards';
+      chatBody.scrollTo({ top: chatBody.scrollHeight, behavior: 'smooth' });
+    });
+    
+    setTimeout(resolve, msgObj.readingDelay);
+  });
+}
+
+async function runConversation() {
+  chatBody.innerHTML = ''; // Clear chat
+  
+  for (const step of conversation) {
+    if (step.type === 'out' && step.typeDelay > 0) {
+      await showTyping(step.typeDelay);
+    }
+    await showMessage(step);
+  }
+  
+  // Loop chat after 5 seconds
+  setTimeout(runConversation, 5000);
+}
+
+// Start sequence slightly after load
+setTimeout(runConversation, 1000);
+
+// ─── SCROLL ANIMATIONS (Intersection Observer) ───
+const observerOptions = { threshold: 0.15, rootMargin: '0px 0px -50px 0px' };
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      entry.target.style.animation = 'fadeInUp 0.6s ease forwards';
+      observer.unobserve(entry.target);
+    }
+  });
+}, observerOptions);
+
+document.querySelectorAll('.feature-card, .how-step, .price-card, .proof-item').forEach(el => {
+  el.style.opacity = '0';
+  el.style.transform = 'translateY(30px)';
+  observer.observe(el);
+});
+
+// ─── NAV SCROLL EFFECT ───
+window.addEventListener('scroll', () => {
+  const nav = document.querySelector('nav');
+  if (window.scrollY > 30) {
+    nav.style.padding = '16px 48px';
+    nav.style.boxShadow = '0 2px 10px rgba(0,0,0,0.05)';
+  } else {
+    nav.style.padding = '20px 48px';
+    nav.style.boxShadow = 'none';
+  }
+});
+
+}); // end DOMContentLoaded
+
+// toggleLegal must be global
+function toggleLegal(id) {
+  const sections = ['impressum', 'datenschutz', 'agb'];
+  sections.forEach(s => {
+    const el = document.getElementById(s);
+    if (el) el.style.display = (s === id && el.style.display === 'none') ? 'block' : 'none';
+  });
+  if (document.getElementById(id)) {
+    document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
+  }
+}
+</script>
+</body>
+</html>
